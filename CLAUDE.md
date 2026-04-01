@@ -5,12 +5,12 @@
 ### Physical Setup
 - **LED grid** mapped as a 2D display in PixelBlaze (currently 8 rows × 32 columns = 256 pixels)
 - **8 acrylic layers** stacked **front-to-back** (depth axis), like a volumetric 3D display
-- Each layer is edge-lit: **24 LEDs run along one edge** of the acrylic, and light diffuses through the entire panel
+- Each layer is edge-lit: **LEDs run along one edge** of the acrylic, and light diffuses through the entire panel
 - The 2D pixel map is already configured on the device
 
 ### How Light Works in This Display
 Because each layer is edge-lit from one side, **the entire acrylic panel glows** based on its edge LEDs. This means:
-- The 24 LEDs on a layer's edge can create gradients or patterns visible within that layer
+- The LEDs on a layer's edge can create gradients or patterns visible within that layer
 - But each layer is a **physically separate glowing plane** — light from one layer does not bleed into adjacent layers
 - The 8 layers create **discrete depth planes**, not a continuous 3D volume
 
@@ -55,27 +55,27 @@ Because each layer is edge-lit from one side, **the entire acrylic panel glows**
   ```
 
 ### Don't: Design for Smooth Cross-Layer Blending
-- Smooth gradients across the Y axis will appear as abrupt jumps between 8 discrete planes
+- Smooth gradients across the Y axis will appear as abrupt jumps between discrete planes
 - Effects relying on pixel-level Y resolution (e.g. fine vertical waves) will look wrong
-- Treat Y as an 8-value enum, not a continuous axis
+- Treat Y as an N-value enum (where N = numLayers), not a continuous axis
 
 ### Effective Effect Types
 The sweet spot is **combining intra-layer and inter-layer animation**:
 
-- **Intra-layer (X axis):** waves, pulses, sparks, gradients, bouncing effects running along each layer's 24 LEDs — these look great since the acrylic diffuses the light from the bottom edge upward
-- **Inter-layer (Y axis):** use per-layer phase offsets, timing delays, or distinct colors so the 8 planes relate to each other meaningfully
+- **Intra-layer (X axis):** waves, pulses, sparks, gradients, bouncing effects running along each layer's LEDs — these look great since the acrylic diffuses the light from the bottom edge upward
+- **Inter-layer (Y axis):** use per-layer phase offsets, timing delays, or distinct colors so the planes relate to each other meaningfully
 - **Front-to-back sweeps/pulses** that cascade through the depth stack
 - **Synchronized but offset animations** — same effect on each layer but staggered in time or phase
 - **Beat/rhythm effects** where different layers trigger at different times
 - **Depth-based brightness or hue shifts** across layers
 
 ### Less Effective Effect Types
-- Smooth gradients flowing *across* layers (Y axis is only 8 discrete steps)
+- Smooth gradients flowing *across* layers (Y axis has only a few discrete steps)
 - Fine-detail 2D patterns that rely on Y resolution
 - Effects designed for uniform flat panels with no notion of depth
 
 ### Physical Note
-LEDs enter each acrylic layer from the **bottom edge**. Light diffuses upward through the panel. This means bottom-to-top gradients within a layer are less meaningful (the whole panel glows), but left-to-right variation along the 24 LEDs is fully visible.
+LEDs enter each acrylic layer from the **bottom edge**. Light diffuses upward through the panel. This means bottom-to-top gradients within a layer are less meaningful (the whole panel glows), but left-to-right variation along the LEDs is fully visible.
 
 ### Brightness Target: ~20% Average
 **Target ~20% average brightness across all pixels at any given moment.** This keeps the display engaging without being harsh, and ensures the acrylic panels glow consistently rather than appearing mostly dark.
@@ -102,6 +102,13 @@ Every pattern should have color variation in multiple dimensions:
 - **Across layers:** Each layer should have visibly distinct hue, not just brightness differences. Use `layerPhase * 0.1–0.3` as hue offsets.
 - **Coupled to brightness:** Bright peaks can shift hue or desaturate toward white; dim regions can shift toward deeper/cooler colors.
 - Avoid static `hsvPickerColor` controls as the sole color source — prefer time-varying hue with the picker as a base offset at most.
+
+### Key Idioms
+- `layer / numLayers` — normalize layer index to 0–1 for smooth per-layer offsets
+- `wave(t + layerPhase * offset)` — same wave, phase-shifted per layer
+- `triangle(t + layerPhase)` — ping-pong animation staggered across layers
+- `random(1)` in `beforeRender` per layer for stochastic effects — use arrays indexed by layer
+- `perlinFbm(x * scale, layer * scale, time, ...)` — organic noise with separate control over within-layer and between-layer variation
 
 ### Avoiding Sawtooth Wrap Glitches
 `time(interval)` returns a sawtooth 0→1. Multiplying by a non-integer fraction (e.g., `t * 0.35`) causes a visible jump when the sawtooth wraps from 1→0. **Use a separate `time()` call** with the adjusted interval instead:
