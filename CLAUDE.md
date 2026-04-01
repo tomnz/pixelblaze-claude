@@ -113,14 +113,54 @@ var t2 = time(0.05 * 0.35); wave(x + t2)
 ```
 Integer multiples (e.g., `t * 8`) are fine because the wrap aligns.
 
-### Pattern File Self-Documentation
-Every pattern JS file should include a header block with:
+### Pattern File Header
+Every pattern JS file should start with a comment block containing:
 1. **Pattern name and device pattern ID** — for updating via `pixelblaze_update_pattern`
-2. **Hardware context** — the edge-lit acrylic display summary and coordinate system
-3. **Effect description** — what the pattern looks like
-4. **Design rationale** — key decisions, parameter choices, and gotchas
+2. **Effect description** — what the pattern looks like, in plain language
+3. **Design notes** — key implementation decisions, algorithms used, and gotchas
 
-This ensures any future session can understand and modify a pattern without needing conversation history.
+Do **not** include hardware context (coordinate system, layer formula, etc.) — that belongs in CLAUDE.md, not repeated in every file.
+
+Example header:
+```js
+// Aurora Australis — Pattern ID: rb4BpMd2d5XDr9t3r
+//
+// Organic aurora using 2D Perlin noise for brightness instead
+// of regular wave() functions. Noise is stretched along X
+// (smooth within layers) and compressed across Y (strong
+// contrast between neighboring layers).
+//
+// Design: Two overlapping perlinFbm fields at different scales
+// blended 70/30. smoothstep(0.3, 0.7) thresholds the noise so
+// peaks hit full brightness but most of the range stays dark.
+// Hue spread 0.6 across layers with perlin-driven modulation.
+```
+
+### Slider Comments
+Every slider function should have a comment on the line above describing what the control does in plain language, as if explaining to a user. Maximum 1 sentence.
+
+Example:
+```js
+// How fast the animation cycles
+export function sliderSpeed(v) { speed = mix(0.01, 0.06, v) }
+// How many raindrops fall at once
+export function sliderDropRate(v) { dropRate = mix(2, 20, v) }
+// How wide each ball is stretched along the LED strips
+export function sliderWidth(v) { xSize = mix(0.08, 0.5, v) }
+// Number of balls bouncing simultaneously (1-5)
+export function sliderBalls(v) { numBalls = floor(mix(1, 5.99, v)) }
+```
+
+### Inline Code Comments
+Add brief comments where the code is not self-documenting. Focus on **why** something is done, not what. Good candidates:
+- Non-obvious parameter values (e.g. `// 0.002 epsilon accounts for fixed-point rounding`)
+- Perlin noise axis mapping (e.g. `// x=position, y=layer, z=time`)
+- Physics or math intent (e.g. `// squared falloff for sharp head with soft tail`)
+- State machine transitions (e.g. `// state 3 = layer blackout`)
+- Bounce/collision logic
+- Anything a reader might need 30 seconds to figure out on their own
+
+Do **not** comment obvious lines like `var speed = 0.03` or `bright = max(bright, 0)`. Let clear variable names and code structure speak for themselves.
 
 ---
 
