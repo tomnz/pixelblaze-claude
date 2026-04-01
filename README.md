@@ -2,6 +2,24 @@
 
 Create and iterate on LED patterns for a [PixelBlaze](https://www.bhencke.com/pixelblaze) controller using [Claude Code](https://docs.anthropic.com/en/docs/claude-code). An MCP server connects Claude directly to your PixelBlaze so it can create, update, and manage patterns on the device.
 
+The included patterns and design guidance (`CLAUDE.md`) are built for a **2D grid mapped as rows and columns** — specifically an edge-lit acrylic depth display where each row is a separate physical layer. The Y axis represents discrete layers (not a smooth gradient), so patterns are designed to create strong visual contrast and coordinated animation *across* layers while running smooth effects *within* each layer.
+
+This approach works well for any 2D PixelBlaze setup where one axis has significantly fewer pixels than the other (e.g. 8 rows x 32 columns), and where per-row visual differentiation matters more than smooth vertical blending.
+
+**Note:** This project assumes the PixelBlaze's [Mapper](https://electromage.com/docs/mapper) has already been configured correctly for your hardware. The mapper defines the 2D pixel map that tells PixelBlaze which physical LED corresponds to which (x, y) coordinate — patterns depend on this being set up before they can work properly.
+
+## Adapting for your hardware
+
+The patterns auto-detect the grid dimensions at startup using `mapPixels()`, so they adapt to different sizes without code changes. To adapt the *design guidance* for a different display:
+
+1. **Edit `CLAUDE.md`** to describe your hardware — pixel layout, how light works physically, what effects look good and which don't
+2. **Update the pixel map** on your PixelBlaze to match your physical layout
+3. **Ask Claude to help you adapt** — for example:
+
+> "I have a 16x16 LED matrix mounted flat on a wall. Both axes have equal resolution and smooth blending. Update CLAUDE.md to reflect this — we don't need to treat Y as discrete layers, and effects should work as true 2D patterns."
+
+> "I have a cylindrical display with 12 rings of 30 LEDs each. X wraps around the cylinder and Y is the vertical axis. Update CLAUDE.md so patterns account for the X-axis wrapping and create effects that look good on a cylinder."
+
 ## What's in the box
 
 - **`src/pixelblaze_mcp/`** -- MCP server that exposes PixelBlaze controls (create/update/delete patterns, set brightness, read device info, etc.)
@@ -116,16 +134,6 @@ Claude has access to these PixelBlaze tools:
 | `pixelblaze_set_control` | Set a slider/control value |
 | `pixelblaze_get_device_info` | Get device status and config |
 | `docs_get_api_reference` | Get the PixelBlaze language reference |
-
-## Adapting for your hardware
-
-The patterns and `CLAUDE.md` are written for a specific display (8-layer edge-lit acrylic panels), but the approach generalizes:
-
-1. **Edit `CLAUDE.md`** to describe your hardware -- pixel layout, how light works physically, what looks good
-2. **Update the pixel map** on your PixelBlaze to match your physical layout
-3. **Start a conversation** with Claude and describe what you want
-
-The patterns auto-detect the number of layers and y-range at startup using `mapPixels()`, so they adapt to different grid sizes without code changes.
 
 ## Project structure
 
