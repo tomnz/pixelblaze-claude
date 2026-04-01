@@ -3,7 +3,7 @@
 ## Hardware: 8-Layer Edge-Lit Acrylic Display
 
 ### Physical Setup
-- **8x24 LED grid** mapped as a 2D display in PixelBlaze
+- **LED grid** mapped as a 2D display in PixelBlaze (currently 8 rows × 32 columns = 256 pixels)
 - **8 acrylic layers** stacked **front-to-back** (depth axis), like a volumetric 3D display
 - Each layer is edge-lit: **24 LEDs run along one edge** of the acrylic, and light diffuses through the entire panel
 - The 2D pixel map is already configured on the device
@@ -15,12 +15,27 @@ Because each layer is edge-lit from one side, **the entire acrylic panel glows**
 - The 8 layers create **discrete depth planes**, not a continuous 3D volume
 
 ### Coordinate System (render2D)
-- **X axis (0–1):** position along the 24-LED edge within a single layer
-- **Y axis (0–1):** which of the 8 layers (depth/front-to-back)
-- PixelBlaze normalizes x and y **independently** to 0–1, so y spans the full 0–1 range across the 8 layers (not compressed to a sub-range)
-- **Layer formula:** `var layer = floor(y * 7.99)` gives the layer index 0–7. Using `7.99` instead of `8` avoids an off-by-one when `y` is exactly 1.0.
-- Y is essentially a **discrete 8-step axis** — fine gradients in Y won't blend smoothly between layers
+- **X axis (0–1):** position along the LEDs within a single layer (normalized regardless of pixel count)
+- **Y axis:** which layer (depth/front-to-back). The y range depends on the pixel map and is **not necessarily 0–1**.
+- **Layer detection (via `mapPixels`):** Every pattern must auto-discover both the y range and the number of layers at init time using `mapPixels()`:
+  ```js
+  var yMin = 1; var yMax = 0
+  var yVals = array(32); var numLayers = 0
+  mapPixels(function (index, x, y, z) {
+    if (y < yMin) yMin = y
+    if (y > yMax) yMax = y
+    var isNew = 1; var j
+    for (j = 0; j < numLayers; j++) { if (abs(y - yVals[j]) < 0.002) { isNew = 0; break } }
+    if (isNew && numLayers < 32) { yVals[numLayers] = y; numLayers++ }
+  })
+  // In render2D:
+  var layer = floor((y - yMin) / (yMax - yMin + 0.0001) * (numLayers - 0.01))
+  var layerPhase = layer / numLayers  // 0–1 normalized
+  ```
+  `mapPixels()` runs once at pattern load — no calibration frames or black flashes. Use `numLayers` instead of hardcoded `8` everywhere.
+- Y is a **discrete axis** (typically 8 steps) — fine gradients in Y won't blend smoothly between layers
 - X gradients within a single layer will be visible and effective
+- Per-layer arrays should be sized `array(32)` (max) but only iterated up to `numLayers`
 
 ---
 
@@ -28,13 +43,15 @@ Because each layer is edge-lit from one side, **the entire acrylic panel glows**
 
 ### Do: Treat Each Layer as an Independent Entity
 - **Per-layer effects:** animate each layer with its own color, brightness, or phase offset
-- **Layer-indexed logic:** use `y` quantized to 8 steps to assign distinct properties per layer
+- **Layer-indexed logic:** use `y` quantized to `numLayers` steps to assign distinct properties per layer
 - **Sequential/chase effects:** light layers one at a time, sweep front-to-back, or cascade
 - **Layered depth illusions:** use brightness falloff by layer to simulate depth or glow
 - Example pattern idiom:
   ```js
-  var layer = floor(y * 7.99)  // 0–7, which layer
-  var posInLayer = x            // 0–1, position along the edge
+  // After calibration (see Coordinate System above):
+  var layer = floor((y - yMin) / (yMax - yMin + 0.0001) * (numLayers - 0.01))
+  var layerPhase = layer / numLayers  // 0–1 normalized
+  var posInLayer = x  // 0–1, position along the edge
   ```
 
 ### Don't: Design for Smooth Cross-Layer Blending
@@ -99,7 +116,7 @@ Integer multiples (e.g., `t * 8`) are fine because the wrap aligns.
 ### Pattern File Self-Documentation
 Every pattern JS file should include a header block with:
 1. **Pattern name and device pattern ID** — for updating via `pixelblaze_update_pattern`
-2. **Hardware context** — the 8-layer edge-lit acrylic display summary and coordinate system
+2. **Hardware context** — the edge-lit acrylic display summary and coordinate system
 3. **Effect description** — what the pattern looks like
 4. **Design rationale** — key decisions, parameter choices, and gotchas
 
@@ -118,5 +135,5 @@ This ensures any future session can understand and modify a pattern without need
 
 ## Device Info
 - Host: 192.168.2.97
-- Pixel count: 8×24 = 192 pixels
+- Pixel count: 8×32 = 256 pixels (4 panels of 8×8)
 - Pixel map: already configured for 2D

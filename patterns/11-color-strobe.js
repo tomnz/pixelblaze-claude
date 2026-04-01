@@ -1,55 +1,51 @@
 // Color Strobe — Pattern ID: qSQsBYADnoHFceARu
 // -------------------------------------------------------
 // Hardware: 8-layer edge-lit acrylic display (8x24 LEDs)
-//   x (0-1) = position along 24 LEDs within a layer
-//   y (0-1) = which layer (front-to-back depth)
-//   Layer index: floor(y * 7.99) → 0-7
+//   x (0-1) = position along the LEDs within a layer
+//   y = which layer (front-to-back depth), auto-calibrated
+//   Layer count: auto-detected via calibration (typically 8)
+//   Calibration: first 2 frames discover actual y range
 // -------------------------------------------------------
-// Maximum framerate chaos. Rapid color cycling across all
-// 8 layers. Each layer gets a different slice of the
-// rainbow that shifts every frame. Designed to be intense
-// and disorienting.
+// Maximum framerate chaos. Rapid color cycling with hard
+// on/off strobing. Each layer gets a different rainbow slice
+// for a frenetic light show effect.
 // -------------------------------------------------------
-// Design: time(0.002) for fastest possible color cycling.
-// Chaos slider controls hard on/off threshold vs smooth
-// waves. Random layer blackout via fast wave for extra
-// punch. Per-layer hue offset (layer/8 * 0.5) ensures
-// distinct colors across depth.
+// Design: Three time() calls at different speeds (fast, medium,
+// base) for layered strobe beats. Chaos slider controls hard
+// threshold cutoff and random blackout probability. Per-layer
+// hue offset (0.5 spread) plus x gradient for rainbow variety.
 // -------------------------------------------------------
 
 var speed = 0.008
 var chaos = 0.7
+var yMin = 1; var yMax = 0
+var yVals = array(32); var numLayers = 0
+mapPixels(function (index, x, y, z) {
+  if (y < yMin) yMin = y
+  if (y > yMax) yMax = y
+  var isNew = 1; var j
+  for (j = 0; j < numLayers; j++) { if (abs(y - yVals[j]) < 0.002) { isNew = 0; break } }
+  if (isNew && numLayers < 32) { yVals[numLayers] = y; numLayers++ }
+})
 
 export function sliderSpeed(v) { speed = mix(0.003, 0.02, v) }
 export function sliderChaos(v) { chaos = v }
 
 export function render2D(index, x, y) {
-  var layer = floor(y * 7.99)
+  var layer = floor((y - yMin) / (yMax - yMin + 0.0001) * (numLayers - 0.01))
   var t = time(speed)
   var tFast = time(0.002)
   var tMed = time(0.005)
-
-  // Base hue: rapid rainbow cycle, offset per layer
-  var hue = tFast + layer / 8 * 0.5
-
-  // X-position adds color variation within each layer
+  var hue = tFast + layer / numLayers * 0.5
   hue = hue + x * 0.3
-
-  // Brightness: multiple fast waves create strobing
-  var b1 = wave(t + layer / 8 * 0.7)
+  var b1 = wave(t + layer / numLayers * 0.7)
   var b2 = wave(tMed + x * 2 + layer * 0.4)
-
-  // Chaos mixes between smooth waves and hard on/off
   var bright = b1 * b2
   if (chaos > 0.5) {
-    // Hard strobe: quantize brightness to on/off
     var thresh = (1 - chaos) * 2
     bright = bright > thresh ? 1 : 0
   }
-
-  // Random layer blackout for extra punch
   var blackout = wave(tFast * 3 + layer * 0.37)
   if (blackout < chaos * 0.3) bright = 0
-
   hsv(hue, 0.7 + bright * 0.3, bright)
 }

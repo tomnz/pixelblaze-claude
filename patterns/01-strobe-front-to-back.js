@@ -1,32 +1,41 @@
 // Strobe Front-to-Back — Pattern ID: bKWeMM74DarQrsNeR
 // -------------------------------------------------------
 // Hardware: 8-layer edge-lit acrylic display (8x24 LEDs)
-//   x (0-1) = position along 24 LEDs within a layer
-//   y (0-1) = which layer (front-to-back depth)
-//   Layer index: floor(y * 7.99) → 0-7
+//   x (0-1) = position along the LEDs within a layer
+//   y = which layer (front-to-back depth), auto-calibrated
+//   Layer count: auto-detected via calibration (typically 8)
+//   Calibration: first 2 frames discover actual y range
 // -------------------------------------------------------
 // Layers light up sequentially front-to-back with a fading
 // trail. Hue cycles over time and shifts per layer for a
-// rainbow chase effect. Uses continuous position (not
-// floor-snapped) for smooth fluid movement.
+// rainbow chase effect with smooth fluid movement.
 // -------------------------------------------------------
-// Design: time(speed)*8 gives continuous position across
-// 8 layers. Trail fades with squared falloff. Hue auto-
-// cycles via time(0.05) with per-layer and per-x offsets.
-// Bright pixels desaturate toward white for hot-head look.
+// Design: Continuous position (not floor-snapped) for smooth
+// motion. Trail length and speed are slider-controllable.
+// Per-layer hue offset (0.3 spread) plus x modulation for
+// color variation across all dimensions.
 // -------------------------------------------------------
 
 var speed = 0.03
 var trailLen = 2
+var yMin = 1; var yMax = 0
+var yVals = array(32); var numLayers = 0
+mapPixels(function (index, x, y, z) {
+  if (y < yMin) yMin = y
+  if (y > yMax) yMax = y
+  var isNew = 1; var j
+  for (j = 0; j < numLayers; j++) { if (abs(y - yVals[j]) < 0.002) { isNew = 0; break } }
+  if (isNew && numLayers < 32) { yVals[numLayers] = y; numLayers++ }
+})
 
 export function sliderSpeed(v) { speed = mix(0.01, 0.06, v) }
 export function sliderTrailLength(v) { trailLen = floor(mix(0, 6, v)) }
 
 export function render2D(index, x, y) {
-  var layer = floor(y * 7.99)
+  var layer = floor((y - yMin) / (yMax - yMin + 0.0001) * (numLayers - 0.01))
   var t = time(speed)
-  var pos = t * 8
-  var dist = mod(pos - layer + 8, 8)
+  var pos = t * numLayers
+  var dist = mod(pos - layer + numLayers, numLayers)
   var bright = 0
   if (dist < 1) {
     bright = 1
@@ -34,8 +43,7 @@ export function render2D(index, x, y) {
     bright = 1 - (dist - 1) / trailLen
     bright = bright * bright
   }
-  // Hue shifts over time and per layer, with x shimmer
-  var hue = time(0.05) + layer / 8 * 0.3 + x * 0.1
+  var hue = time(0.05) + layer / numLayers * 0.3 + x * 0.1
   var sat = 1 - bright * 0.3
   hsv(hue, sat, bright)
 }

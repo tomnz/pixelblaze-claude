@@ -5,7 +5,7 @@
 - Layers are stacked **front-to-back** (depth display)
 - LEDs enter each acrylic panel from the **bottom edge**
 - `x` (0–1): position along 24 LEDs within a layer
-- `y` (0–1): which layer — **use `floor(y * 7.99)`** to get layer index 0–7. PixelBlaze normalizes y independently to 0–1.
+- `y`: which layer — auto-calibrate the y range at startup, then use `floor((y - yMin) / (yMax - yMin + 0.0001) * 7.99)` to get layer index 0–7. The y range is not necessarily 0–1.
 
 ## General Pattern-Writing Approach
 
@@ -18,16 +18,19 @@ Every good pattern for this display works on two levels simultaneously:
 
 ### Code Structure Template
 ```js
-// Per-frame state
+// Y-range calibration (required — y is not necessarily 0–1)
+var yMin = 1; var yMax = 0; var calibrated = 0
 var t1, t2;
 
 export function beforeRender(delta) {
+  if (calibrated < 3) calibrated++
   t1 = time(0.1)  // slow cycle
   t2 = time(0.04) // faster cycle
 }
 
 export function render2D(index, x, y) {
-  var layer = floor(y * 7.99)                  // 0–7, which acrylic layer
+  if (calibrated < 2) { if (y < yMin) yMin = y; if (y > yMax) yMax = y; hsv(0,0,0); return }
+  var layer = floor((y - yMin) / (yMax - yMin + 0.0001) * 7.99)  // 0–7
   var layerPhase = layer / 8                    // 0–1, normalized layer offset
 
   // Intra-layer: something varies with x
